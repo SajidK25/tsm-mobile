@@ -1,0 +1,674 @@
+import 'package:canuck_mall/app/model/recomended_product_model.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:canuck_mall/app/constants/app_icons.dart';
+import 'package:canuck_mall/app/constants/app_images.dart';
+import 'package:canuck_mall/app/constants/app_urls.dart';
+import 'package:canuck_mall/app/localization/app_static_key.dart';
+import 'package:canuck_mall/app/modules/product_details/widgets/color_palette.dart';
+import 'package:canuck_mall/app/modules/product_details/widgets/product_size_selector.dart';
+import 'package:canuck_mall/app/routes/app_pages.dart';
+import 'package:canuck_mall/app/themes/app_colors.dart';
+import 'package:canuck_mall/app/utils/app_size.dart';
+import 'package:canuck_mall/app/widgets/app_button/app_common_button.dart';
+import 'package:canuck_mall/app/widgets/app_button/quantity_button.dart';
+import 'package:canuck_mall/app/widgets/app_image/app_image.dart';
+import 'package:canuck_mall/app/widgets/app_text.dart';
+import 'package:canuck_mall/app/widgets/tipple.dart';
+import 'package:canuck_mall/app/utils/log/app_log.dart';
+import '../controllers/product_details_controller.dart';
+
+class ProductDetailsView extends GetView<ProductDetailsController> {
+  const ProductDetailsView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        surfaceTintColor: AppColors.white,
+        title: AppText(
+          title: AppStaticKey.productDetails,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        centerTitle: true,
+        actions: [
+          Tipple(
+            onTap: () {},
+            height: AppSize.height(height: 5.0),
+            width: AppSize.height(height: 5.0),
+            borderRadius: BorderRadius.circular(AppSize.height(height: 100.0)),
+            positionTop: -8,
+            positionRight: -10,
+            child: ImageIcon(
+              AssetImage(AppIcons.share),
+              size: AppSize.height(height: 3.0),
+            ),
+          ),
+        ],
+        actionsPadding: EdgeInsets.symmetric(
+          horizontal: AppSize.height(height: 2.0),
+        ),
+      ),
+      body: Obx(() {
+        final product = controller.product.value;
+
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (product == null) {
+          return const Center(child: Text('Product not found'));
+        }
+
+        final variants = product.productVariantDetails;
+        final colors = variants.map((v) => v.variantId.color).toSet().toList();
+        final sizes = variants.map((v) => v.variantId.size).toSet().toList();
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSize.height(height: 2.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Main Image Display with PageView
+              Obx(() {
+                final currentIndex = controller.currentImageIndex.value;
+                final images = product.images.isNotEmpty 
+                    ? product.images 
+                    : [AppImages.banner3];
+                
+                return Column(
+                  children: [
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppSize.height(height: 1.5),
+                          ),
+                          child: AspectRatio(
+                            aspectRatio: 1.0, // Square aspect ratio
+                            child: PageView.builder(
+                              itemCount: images.length,
+                              onPageChanged: (index) {
+                                controller.currentImageIndex.value = index;
+                              },
+                              itemBuilder: (context, index) {
+                                final imageUrl = images[index].startsWith('http')
+                                    ? images[index]
+                                    : AppUrls.imageUrl + images[index];
+                                
+                                return AppImage(
+                                  imagePath: imageUrl,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(Icons.error, color: AppColors.error),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        // Favorite Button
+                        Positioned(
+                          top: AppSize.height(height: 1.5),
+                          right: AppSize.width(width: 2.0),
+                          child: InkWell(
+                            onTap: () => controller.toggleFavorite(),
+                            child: Obx(
+                              () => Container(
+                                padding: EdgeInsets.all(AppSize.height(height: 0.5)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSize.height(height: 100.0),
+                                  ),
+                                ),
+                                child: Icon(
+                                  controller.isFavourite.value
+                                      ? Icons.favorite_outlined
+                                      : Icons.favorite_border,
+                                  size: AppSize.height(height: 2.5),
+                                  color:
+                                      controller.isFavourite.value
+                                          ? AppColors.lightRed
+                                          : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Image Counter
+                        if (images.length > 1)
+                          Positioned(
+                            bottom: AppSize.height(height: 1.5),
+                            right: AppSize.width(width: 2.0),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppSize.width(width: 2.0),
+                                vertical: AppSize.height(height: 0.5),
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(
+                                  AppSize.height(height: 2.0),
+                                ),
+                              ),
+                              child: Text(
+                                '${currentIndex + 1}/${images.length}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppSize.height(height: 1.5),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    // Thumbnail Images
+                    if (images.length > 1) ...[
+                      SizedBox(height: AppSize.height(height: 1.0)),
+                      SizedBox(
+                        height: AppSize.height(height: 8.0),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: images.length,
+                          itemBuilder: (context, index) {
+                            final imageUrl = images[index].startsWith('http')
+                                ? images[index]
+                                : AppUrls.imageUrl + images[index];
+                            
+                            final isSelected = currentIndex == index;
+                            
+                            return GestureDetector(
+                              onTap: () {
+                                controller.currentImageIndex.value = index;
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(
+                                  right: AppSize.width(width: 2.0),
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: isSelected 
+                                        ? AppColors.primary 
+                                        : AppColors.lightGray,
+                                    width: isSelected ? 3 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSize.height(height: 1.0),
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSize.height(height: 0.8),
+                                  ),
+                                  child: AppImage(
+                                    imagePath: imageUrl,
+                                    width: AppSize.height(height: 8.0),
+                                    height: AppSize.height(height: 8.0),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Icon(Icons.error, color: AppColors.error),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              }),
+              SizedBox(height: AppSize.height(height: 1.5)),
+
+              AppText(
+                title: product.name,
+                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                  fontSize: AppSize.height(height: 2.0),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: AppSize.height(height: 0.5)),
+
+              InkWell(
+                onTap: () {
+                  Get.toNamed(Routes.reviews, arguments: product.id);
+                },
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star,
+                      color: Colors.amber,
+                      size: AppSize.height(height: 2.5),
+                    ),
+                    SizedBox(width: AppSize.width(width: 0.5)),
+                    RichText(
+                      text: TextSpan(
+                        text: product.avgRating.toStringAsFixed(1),
+                        style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: " (${product.totalReviews})",
+                            style: Theme.of(context).textTheme.bodySmall!
+                                .copyWith(color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: AppSize.height(height: 0.5)),
+
+              Obx(() {
+                // Get selected variant based on color and size
+                final selectedVariant = product.productVariantDetails.firstWhere(
+                  (v) => v.variantId.color.name == controller.selectColor.value &&
+                         v.variantId.size == controller.selectedProductSize.value,
+                  orElse: () => product.productVariantDetails.isNotEmpty 
+                      ? product.productVariantDetails.first 
+                      : ProductVariantDetails(
+                          variantId: Variant(
+                            id: '', categoryId: '', subCategoryId: '', createdBy: '',
+                            networkType: [], size: '', isDeleted: false, slug: '',
+                            createdAt: DateTime.now(), updatedAt: DateTime.now(),
+                            color: ColorData(name: '', code: ''),
+                          ),
+                          variantQuantity: 0,
+                          variantPrice: product.basePrice,
+                        ),
+                );
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        AppText(
+                          title: "\$${selectedVariant.variantPrice.toStringAsFixed(2)}",
+                          style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                            fontWeight: FontWeight.w900,
+                            fontSize: AppSize.height(height: 2.5),
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        if (selectedVariant.variantPrice != product.basePrice) ...[
+                          SizedBox(width: AppSize.width(width: 2.0)),
+                          AppText(
+                            title: "\$${product.basePrice.toStringAsFixed(2)}",
+                            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              fontSize: AppSize.height(height: 2.0),
+                              decoration: TextDecoration.lineThrough,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    SizedBox(height: AppSize.height(height: 0.5)),
+                    Row(
+                      children: [
+                        Icon(
+                          selectedVariant.variantQuantity > 0 
+                              ? Icons.check_circle 
+                              : Icons.cancel,
+                          size: 16,
+                          color: selectedVariant.variantQuantity > 0 
+                              ? Colors.green 
+                              : Colors.red,
+                        ),
+                        SizedBox(width: 4),
+                        AppText(
+                          title: selectedVariant.variantQuantity > 0
+                              ? "In Stock (${selectedVariant.variantQuantity} available)"
+                              : "Out of Stock",
+                          style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                            color: selectedVariant.variantQuantity > 0 
+                                ? Colors.green 
+                                : Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }),
+              SizedBox(height: AppSize.height(height: 1.0)),
+              Divider(color: AppColors.lightGray),
+
+              // Shop info section
+              SizedBox(height: AppSize.height(height: 1.0)),
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSize.height(height: 1.0)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        AppSize.height(height: 100.0),
+                      ),
+                      child: AppImage(
+                        imagePath: AppUrls.imageUrl + product.shop.logo,
+                        height: AppSize.height(height: 5.5),
+                        width: AppSize.height(height: 5.5),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Icon(Icons.error, color: AppColors.error),
+                      ),
+                    ),
+                    SizedBox(width: AppSize.width(width: 2.0)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppText(
+                            title: product.shop.name,
+                            style: Theme.of(context).textTheme.titleSmall!
+                                .copyWith(fontWeight: FontWeight.w900),
+                          ),
+                          AppText(
+                            title: product.shop.address.country,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Visit Store button
+                    InkWell(
+                      onTap: () {
+                        AppLogger.info(
+                          'Navigating to storeId: ${product.shop.id}',
+                        );
+                        Get.toNamed(Routes.store, arguments: product.shop.id);
+                      },
+                      borderRadius: BorderRadius.circular(
+                        AppSize.height(height: 0.5),
+                      ),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSize.height(height: 1.2),
+                          vertical: AppSize.height(height: 0.8),
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(
+                            AppSize.height(height: 0.5),
+                          ),
+                        ),
+                        child: AppText(
+                          title: AppStaticKey.visitStore,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleSmall!.copyWith(
+                            color: AppColors.white,
+                            fontSize: AppSize.height(height: 1.5),
+                          ),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+              Divider(color: AppColors.lightGray),
+
+              AppText(
+                title: AppStaticKey.description,
+                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                  fontSize: AppSize.height(height: 2.0),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: AppSize.height(height: 1.0)),
+              AppText(
+                title: product.description,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              SizedBox(height: AppSize.height(height: 1.0)),
+
+              if (colors.isNotEmpty) ...[
+                Divider(color: AppColors.lightGray),
+                AppText(
+                  title: "${AppStaticKey.color}:",
+                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    fontSize: AppSize.height(height: 2.0),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Obx(
+                  () => Row(
+                    children:
+                        colors.map((color) {
+                          // Convert hex color code to Flutter Color
+                          Color colorValue;
+                          try {
+                            String code = color.code.trim();
+                            // Remove # if present
+                            if (code.startsWith('#')) {
+                              code = code.substring(1);
+                            }
+                            // Add alpha channel if not present (6 chars = RGB, need ARGB)
+                            if (code.length == 6) {
+                              code = 'FF$code'; // Add full opacity
+                            }
+                            // Parse as hex integer
+                            colorValue = Color(int.parse(code, radix: 16));
+                          } catch (e) {
+                            // Fallback to grey if parsing fails
+                            print('Error parsing color ${color.code}: $e');
+                            colorValue = Colors.grey;
+                          }
+                          
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: AppSize.width(width: 2.0),
+                            ),
+                            child: Column(
+                              children: [
+                                ColorPalette(
+                                  onChanged: (value) {
+                                    controller.updateSelectedColor(value);
+                                  },
+                                  value: color.name,
+                                  group: controller.selectColor.value,
+                                  color: colorValue,
+                                ),
+                                SizedBox(height: AppSize.height(height: 0.5)),
+                                AppText(
+                                  title: color.name.isNotEmpty ? color.name : color.code,
+                                  style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                    fontWeight: controller.selectColor.value == color.name
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
+              ],
+
+              if (sizes.isNotEmpty) ...[
+                AppText(
+                  title: "${AppStaticKey.size}:",
+                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                    fontSize: AppSize.height(height: 2.0),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Obx(
+                  () => Wrap(
+                    spacing: AppSize.width(width: 2.0),
+                    children:
+                        sizes.map((size) {
+                          return ProductSizeSelector(
+                            value: size,
+                            group: controller.selectedProductSize.value,
+                            onChanged: (value) {
+                              controller.updateSelectedSize(value);
+                            },
+                          );
+                        }).toList(),
+                  ),
+                ),
+              ],
+
+              Divider(color: AppColors.lightGray),
+              AppText(
+                title: "${AppStaticKey.quantity}:",
+                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                  fontSize: AppSize.height(height: 2.0),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              QuantityButton(
+                onChanged: (qty) => controller.selectedQuantity.value = qty,
+              ),
+              Divider(color: AppColors.lightGray),
+            ],
+          ),
+        );
+      }),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(AppSize.height(height: 2.0)),
+            topRight: Radius.circular(AppSize.height(height: 2.0)),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              spreadRadius: 3,
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(AppSize.height(height: 2.0)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppCommonButton(
+                onPressed: () {
+                  controller.handleCreateChat(shopId: controller.product.value?.shop.id ?? '');
+                },
+                title: AppStaticKey.sendMessageToSeller,
+                backgroundColor: AppColors.white,
+                style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                  fontSize: AppSize.height(height: 2.0),
+                  color: AppColors.primary,
+                ),
+              ),
+              SizedBox(height: AppSize.height(height: 1.0)),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppCommonButton(
+                      onPressed: () async {
+                        // Keep original add-to-cart behavior but navigate to checkout immediately after adding
+                        await controller.addProductToCart();
+                        // Build products argument for checkout using selected variant, qty and computed price
+                        final prod = controller.product.value;
+                        if (prod == null) return;
+                        final variantId = controller.selectedVariantId.value.isNotEmpty
+                            ? controller.selectedVariantId.value
+                            : (prod.productVariantDetails.isNotEmpty ? prod.productVariantDetails.first.variantId.id : '');
+                        // Safely find variant — firstWhere must return non-null, so handle with try/catch
+                        ProductVariantDetails? variant;
+                        try {
+                          variant = prod.productVariantDetails.firstWhere((v) => v.variantId.id == variantId);
+                        } catch (_) {
+                          variant = prod.productVariantDetails.isNotEmpty ? prod.productVariantDetails.first : null;
+                        }
+                        final unitPrice = variant != null ? variant.variantPrice : prod.basePrice;
+                        final qty = controller.selectedQuantity.value;
+                        final totalPrice = unitPrice * qty;
+                        final productsArg = [
+                          {
+                            'productId': prod.id,
+                            'variantId': variantId,
+                            'quantity': qty,
+                            'totalPrice': totalPrice,
+                            'name': prod.name,
+                          }
+                        ];
+                        Get.toNamed(
+                          Routes.checkoutView,
+                          arguments: {
+                            'products': productsArg,
+                            'itemCost': totalPrice,
+                            'shopId': prod.shop.id,
+                          },
+                        );
+                      },
+                      title: AppStaticKey.addToCart,
+                      backgroundColor: AppColors.white200,
+                      borderColor: AppColors.lightGray,
+                      style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                        fontSize: AppSize.height(height: 2.0),
+                        color: AppColors.black,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: AppSize.width(width: 3.0)),
+                  Expanded(
+                    child: AppCommonButton(
+                      onPressed: () {
+                        // Immediately navigate to checkout with the selected options (no validation)
+                        final prod = controller.product.value;
+                        if (prod == null) return;
+                        final variantId = controller.selectedVariantId.value.isNotEmpty
+                            ? controller.selectedVariantId.value
+                            : (prod.productVariantDetails.isNotEmpty ? prod.productVariantDetails.first.variantId.id : '');
+                        final variant = prod.productVariantDetails.firstWhere(
+                          (v) => v.variantId.id == variantId,
+                         
+                        );
+                        final unitPrice = variant.variantPrice;
+                        final qty = controller.selectedQuantity.value;
+                        final totalPrice = unitPrice * qty;
+                        final productsArg = [
+                          {
+                            'productId': prod.id,
+                            'variantId': variantId,
+                            'quantity': qty,
+                            'totalPrice': totalPrice,
+                            'name': prod.name,
+                          }
+                        ];
+                        Get.toNamed(
+                          Routes.checkoutView,
+                          arguments: {
+                            'products': productsArg,
+                            'itemCost': totalPrice,
+                            'shopId': prod.shop.id,
+                          },
+                        );
+                      },
+                      title: AppStaticKey.buyNow,
+                      style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                        fontSize: AppSize.height(height: 2.0),
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
