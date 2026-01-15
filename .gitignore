@@ -48,3 +48,19 @@ app.*.map.json
 .fvm/flutter_sdk
 .fvm/versions
 !.fvm/fvm_config.json
+
+
+
+# ===============================
+# Android signing (SECURITY)
+# ===============================
+android/key.properties
+*.jks
+*.keystore
+
+# ===============================
+# Environment files
+# ===============================
+.env
+.env.*
+
